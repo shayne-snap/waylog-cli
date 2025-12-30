@@ -9,29 +9,46 @@ mod watcher;
 
 use clap::Parser;
 use cli::{Cli, Commands};
-use error::Result;
+use error::{Result, WaylogError};
+use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::debug;
 use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Detect project root (find .waylog or .git)
-    let project_root = utils::path::find_project_root();
+    let cli = Cli::parse();
+
+    // 1. Determine project root based on command strictness
+    let found_root = utils::path::find_project_root();
+
+    let (project_root, is_new_project) = match &cli.command {
+        Commands::Pull { .. } => match found_root {
+            Some(root) => (root, false),
+            None => return Err(WaylogError::ProjectNotFound),
+        },
+        Commands::Run { .. } => match found_root {
+            Some(root) => (root, false),
+            None => {
+                // For 'run', if no project found, initialize in current dir
+                let current = std::env::current_dir()?;
+                (current, true)
+            }
+        },
+    };
+
+    // 2. Setup logging (only now that we have a valid root)
     let log_dir = project_root.join(".waylog").join("logs");
 
-    // Create log directory if it doesn't exist
+    // Only create directory if we are actually proceeding (which we are if we passed the check above)
+    // For 'Run' (new project), this is where the directory effectively gets created
     std::fs::create_dir_all(&log_dir)?;
 
     // Create file appender (daily rotation)
     let file_appender = tracing_appender::rolling::daily(log_dir, "waylog.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
-    let cli = Cli::parse();
-
     // Determine log level based on verbose flag
-    // Currently EnvFilter::from_default_env takes precedence if RUST_LOG is set
-    // Otherwise fallback to "debug" if verbose is true, or "info" if false
     let log_level = if cli.verbose { "debug" } else { "info" };
 
     // Initialize logging to both console and file
@@ -42,10 +59,17 @@ async fn main() -> Result<()> {
 
     tracing::subscriber::set_global_default(subscriber).expect("Failed to set tracing subscriber");
 
+    if is_new_project {
+        tracing::info!(
+            "Initializing new waylog project in: {}",
+            project_root.display()
+        );
+    }
+
     match cli.command {
         Commands::Run { agent, args } => {
             if let Some(agent_name) = agent {
-                if let Err(e) = run_agent(&agent_name, args).await {
+                if let Err(e) = run_agent(&agent_name, args, project_root).await {
                     match e {
                         error::WaylogError::ProviderNotFound(name) => {
                             eprintln!("Error: '{}' is not a recognized agent.\n", name);
@@ -71,18 +95,21 @@ async fn main() -> Result<()> {
             }
         }
         Commands::Pull { provider, force } => {
-            pull_history(provider, force, cli.verbose).await?;
+            pull_history(provider, force, cli.verbose, project_root).await?;
         }
     }
 
     Ok(())
 }
 
-async fn pull_history(provider_name: Option<String>, force: bool, verbose: bool) -> Result<()> {
+async fn pull_history(
+    provider_name: Option<String>,
+    force: bool,
+    verbose: bool,
+    project_path: PathBuf,
+) -> Result<()> {
     use synchronizer::SyncStatus;
 
-    // Detect project root
-    let project_path = utils::path::find_project_root();
     println!(
         "Pulling chat history for project: {}",
         project_path.display()
@@ -190,7 +217,8 @@ async fn pull_history(provider_name: Option<String>, force: bool, verbose: bool)
 
     Ok(())
 }
-async fn run_agent(agent: &str, args: Vec<String>) -> Result<()> {
+
+async fn run_agent(agent: &str, args: Vec<String>, project_path: PathBuf) -> Result<()> {
     use std::process::Stdio;
     use tokio::process::Command;
 
@@ -207,8 +235,6 @@ async fn run_agent(agent: &str, args: Vec<String>) -> Result<()> {
         std::process::exit(1);
     }
 
-    // Detect project root
-    let project_path = utils::path::find_project_root();
     tracing::info!("Starting {} in {}", provider.name(), project_path.display());
 
     // Ensure .waylog/history directory exists

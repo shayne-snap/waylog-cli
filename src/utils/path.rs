@@ -61,13 +61,13 @@ pub fn get_waylog_dir(project_dir: &Path) -> PathBuf {
 /// moving upwards from the current directory.
 /// If we reach the home directory or the system root without finding a marker,
 /// returns the current directory to avoid treat the whole home as a project.
-pub fn find_project_root() -> PathBuf {
+pub fn find_project_root() -> Option<PathBuf> {
     let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let home = home_dir().ok();
 
     for path in current_dir.ancestors() {
         if path.join(".waylog").is_dir() || path.join(".git").is_dir() {
-            return path.to_path_buf();
+            return Some(path.to_path_buf());
         }
 
         // Stop if we've reached the user's home directory
@@ -78,7 +78,7 @@ pub fn find_project_root() -> PathBuf {
         }
     }
 
-    current_dir
+    None
 }
 
 /// Ensure a directory exists, creating it if necessary

@@ -13,6 +13,9 @@ pub enum WaylogError {
 
     #[error("Path error: {0}")]
     PathError(String),
+
+    #[error("No waylog project found.\nTo start a new session, use `waylog run <AGENT>`.\nTo sync history, please run this command inside a git repository or an active waylog project.")]
+    ProjectNotFound,
 }
 
 pub type Result<T> = std::result::Result<T, WaylogError>;
