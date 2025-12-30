@@ -3,7 +3,7 @@ name = "waylog-cli"
 version = "0.1.1"
 edition = "2021"
 authors = ["WayLog Contributors"]
-description = "Seamlessly sync and archive your AI coding conversations locally."
+description = " Automatically save chats from Claude, Codex, and Gemini CLI to local Markdown files."
 license = "Apache-2.0"
 
 [[bin]]
