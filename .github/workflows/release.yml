@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*' # Trigger when pushing tags starting with v, e.g. v0.1.0
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build for ${{ matrix.os }}
@@ -42,6 +45,30 @@ jobs:
           asset_name: ${{ matrix.asset_name }}
           tag: ${{ github.ref }}
           overwrite: true
+          make_latest: true
+          draft: true
+          prerelease: false
+          body: |
+            ## WayLog ${{ github.ref_name }}
+            
+            ### 📦 Installation
+            
+            **Homebrew (macOS/Linux):**
+            ```bash
+            brew install shayne-snap/tap/waylog
+            ```
+            
+            **Direct Download:**
+            - [macOS (ARM64)](https://github.com/shayne-snap/waylog-cli/releases/download/${{ github.ref_name }}/waylog-macos-arm64.tar.gz)
+            - [Linux (x64)](https://github.com/shayne-snap/waylog-cli/releases/download/${{ github.ref_name }}/waylog-linux-x64.tar.gz)
+            
+            ### ✨ What's New
+            
+            <!-- Add release notes here before publishing -->
+            
+            ### 📝 Full Changelog
+            
+            See commit history for details.
 
   update-formula:
     needs: build
