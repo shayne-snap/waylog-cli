@@ -25,3 +25,7 @@ pub fn all_providers() -> Vec<Arc<dyn base::Provider>> {
         Arc::new(gemini::GeminiProvider::new()),
     ]
 }
+/// Get a list of supported provider names
+pub fn list_providers() -> Vec<&'static str> {
+    vec!["claude", "gemini", "codex"]
+}

@@ -18,7 +18,7 @@ pub enum Commands {
     /// Run an AI CLI tool and automatically sync its chat history
     Run {
         /// The AI tool to run (codex, claude, gemini)
-        agent: String,
+        agent: Option<String>,
 
         /// Additional arguments to pass to the agent
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]

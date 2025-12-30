@@ -1,6 +1,6 @@
 [package]
 name = "waylog-cli"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["WayLog Contributors"]
 description = "A CLI tool to automatically sync AI chat history from various tools"

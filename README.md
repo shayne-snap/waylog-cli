@@ -5,7 +5,7 @@
 
 **Seamlessly sync, preserve, and version-control your AI coding conversations locally.**
 
-WayLog CLI is a lightweight, blazing-fast tool written in Rust that automatically captures and archives your AI coding sessions (Cursor, Claude Code, Gemini) into clean, searchable local Markdown files. Stop losing your context to session timeouts—WayLog CLI helps you own your AI history locally.
+WayLog CLI is a lightweight tool written in Rust that automatically saves your AI coding sessions (Claude Code, Gemini CLI, OpenAI Codex CLI) into clean, searchable local Markdown files. Stop losing your context to session timeouts—WayLog CLI helps you own your AI history locally.
 
 [中文文档](README_zh.md) | [English](README.md)
 
@@ -13,34 +13,27 @@ WayLog CLI is a lightweight, blazing-fast tool written in Rust that automaticall
 
 ## ✨ Features
 
-- **🛡️ Zero Config Integration**: Wraps your existing AI tools (`claude`, `gemini`, `codex`) transparently.
-- **⚡️ Blazing Fast**: Written in Rust for minimal overhead and instant startup.
 - **🔄 Auto-Sync**: Real-time synchronization of chat history to `.waylog/history/` as you type.
 - **📦 Full History Recovery**: The `pull` command scans your entire machine to recover past sessions into the current project.
 - **📝 Markdown Native**: All history is saved as high-quality Markdown files with frontmatter metadata.
-- **🚫 Stateless Design**: No database required. Your Markdown files are the single source of truth.
+
 
 ## 🚀 Installation
 
-### Using Homebrew (Recommended)
+### Using Homebrew
 
 ```bash
 brew install shayne-snap/tap/waylog
 ```
 
-### From Source
-
-```bash
-git clone https://github.com/shayne-snap/waylog-cli.git
-cd waylog-cli
-./scripts/install.sh
-```
 
 ## 💡 Usage
 
 ### 1. Real-time Logging (`run`)
 
 Use `waylog run` instead of calling your AI tool directly. WayLog will launch the agent and record the conversation in real-time.
+
+
 
 ```bash
 # Run Claude Code with auto-sync
@@ -49,24 +42,24 @@ waylog run claude
 # Run Gemini CLI
 waylog run gemini
 
-# Pass arguments transparently
-waylog run claude -- --model claude-3-opus
+# Run Codex CLI
+waylog run codex
 ```
+
+![WayLog Run Demo](demo/run.gif)
+
 
 ### 2. Full Sync / Recover History (`pull`)
 
 Scans your local AI provider storage and "pulls" all relevant sessions into your project's `.waylog` folder.
 
+
+
 ```bash
 # Pull all history for the current project
 waylog pull
-
-# Pull only from a specific provider
-waylog pull --provider claude
-
-# Force re-sync (overwrite existing files)
-waylog pull --force
 ```
+![WayLog Pull Demo](demo/pull.gif)
 
 ## 📂 Supported Providers
 
@@ -74,21 +67,16 @@ waylog pull --force
 |----------|--------|-------------|
 | **Claude Code** | 🚧 Beta | Supports `claude` CLI tool from Anthropic. |
 | **Gemini CLI** | 🚧 Beta | Supports Google's Gemini CLI tools. |
-| **Codex** | 🚧 Beta | Supports OpenAI Codex CLI with smart project-path filtering. |
+| **Codex** | 🚧 Beta | Supports OpenAI Codex CLI. |
 
-## 🛠 Directory Structure
+### Dev build
 
-WayLog keeps everything inside your project directory, making it easy to commit to Git:
-
-```text
-my-project/
-├── .waylog/
-│   ├── history/       # Your chat logs live here
-│   │   ├── 2025-01-01_10-00-00Z-claude-refactor-login.md
-│   │   └── 2025-01-01_14-30-00Z-gemini-fix-bug.md
-│   └── state.json     # Internal sync state
-└── ...
+```bash
+git clone https://github.com/shayne-snap/waylog-cli.git
+cd waylog-cli
+./scripts/install.sh
 ```
+
 
 ## 🤝 Contributing
 

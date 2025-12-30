@@ -44,7 +44,31 @@ async fn main() -> Result<()> {
 
     match cli.command {
         Commands::Run { agent, args } => {
-            run_agent(&agent, args).await?;
+            if let Some(agent_name) = agent {
+                if let Err(e) = run_agent(&agent_name, args).await {
+                    match e {
+                        error::WaylogError::ProviderNotFound(name) => {
+                            eprintln!("Error: '{}' is not a recognized agent.\n", name);
+                            eprintln!("Available agents:");
+                            for provider in providers::list_providers() {
+                                eprintln!("- {}", provider);
+                            }
+                            eprintln!("\nDid you mean to run 'waylog pull'?");
+                            std::process::exit(1);
+                        }
+                        _ => return Err(e),
+                    }
+                }
+            } else {
+                eprintln!("Error: Missing required argument <AGENT>\n");
+                eprintln!("Usage: waylog run <AGENT> [ARGS]...\n");
+                eprintln!("Available agents:");
+                for provider in providers::list_providers() {
+                    eprintln!("- {}", provider);
+                }
+                eprintln!("\nExample:\n  waylog run claude");
+                std::process::exit(1);
+            }
         }
         Commands::Pull { provider, force } => {
             pull_history(provider, force, cli.verbose).await?;
