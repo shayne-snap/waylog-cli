@@ -88,6 +88,7 @@ jobs:
         id: get_release
         uses: actions/github-script@v7
         with:
+          result-encoding: string
           script: |
             const release = await github.rest.repos.getReleaseByTag({
               owner: context.repo.owner,
