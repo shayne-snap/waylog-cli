@@ -6,6 +6,10 @@ authors = ["WayLog Contributors"]
 description = "A CLI tool to automatically sync AI chat history from various tools"
 license = "Apache-2.0"
 
+[[bin]]
+name = "waylog"
+path = "src/main.rs"
+
 [dependencies]
 # CLI framework
 clap = { version = "4.5", features = ["derive"] }
