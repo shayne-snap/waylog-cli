@@ -17,12 +17,13 @@ jobs:
     steps:
       - name: Create Release
         id: create_release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: WayLog ${{ github.ref_name }}
           draft: true
           prerelease: false
+          make_latest: false
           generate_release_notes: true
 
   build-release:
