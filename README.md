@@ -26,6 +26,12 @@ WayLog CLI is a lightweight tool written in Rust that automatically saves your A
 brew install shayne-snap/tap/waylog
 ```
 
+### Using Cargo
+
+```bash
+cargo install waylog
+```
+
 
 ## 💡 Usage
 
