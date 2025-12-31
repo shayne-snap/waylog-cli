@@ -1,6 +1,6 @@
 [package]
 name = "waylog-cli"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 authors = ["WayLog Contributors"]
 description = "Automatically save chats from Claude, Codex, and Gemini CLI to local Markdown files."
