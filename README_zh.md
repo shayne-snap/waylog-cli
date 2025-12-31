@@ -25,6 +25,11 @@ WayLog CLI 是一个轻量级的工具，自动捕捉并存档你的 AI 编程�
 brew install shayne-snap/tap/waylog
 ```
 
+### 使用 Cargo
+
+```bash
+cargo install waylog
+```
 
 
 ## 💡 使用方法

@@ -1,5 +1,5 @@
 [package]
-name = "waylog-cli"
+name = "waylog"
 version = "0.1.2"
 edition = "2021"
 authors = ["WayLog Contributors"]
@@ -7,7 +7,6 @@ description = "Automatically save chats from Claude, Codex, and Gemini CLI to lo
 license = "Apache-2.0"
 repository = "https://github.com/shayne-snap/waylog-cli"
 homepage = "https://github.com/shayne-snap/waylog-cli"
-documentation = "https://github.com/shayne-snap/waylog-cli#readme"
 
 [[bin]]
 name = "waylog"
