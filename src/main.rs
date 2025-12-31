@@ -9,7 +9,7 @@ mod watcher;
 
 use clap::Parser;
 use cli::{Cli, Commands};
-use error::{Result, WaylogError};
+use error::Result;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::debug;
@@ -24,8 +24,31 @@ async fn main() -> Result<()> {
 
     let (project_root, is_new_project) = match &cli.command {
         Commands::Pull { .. } => match found_root {
-            Some(root) => (root, false),
-            None => return Err(WaylogError::ProjectNotFound),
+            Some(root) => {
+                println!("Found existing tracking at: {}", root.display());
+                (root, false)
+            }
+            None => {
+                // Interactive prompt for initialization
+                let current_dir = std::env::current_dir()?;
+                let waylog_path = current_dir.join(".waylog");
+
+                println!("Not initialized.");
+                println!("Start tracking AI chat history in this directory?");
+                println!("Path: {}", waylog_path.display());
+
+                if dialoguer::Confirm::new()
+                    .default(true)
+                    .show_default(true)
+                    .interact()
+                    .unwrap_or(false)
+                {
+                    (current_dir, true)
+                } else {
+                    println!("Aborted.");
+                    std::process::exit(0);
+                }
+            }
         },
         Commands::Run { .. } => match found_root {
             Some(root) => (root, false),

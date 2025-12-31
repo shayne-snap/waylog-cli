@@ -66,7 +66,7 @@ pub fn find_project_root() -> Option<PathBuf> {
     let home = home_dir().ok();
 
     for path in current_dir.ancestors() {
-        if path.join(".waylog").is_dir() || path.join(".git").is_dir() {
+        if path.join(".waylog").is_dir() {
             return Some(path.to_path_buf());
         }
 

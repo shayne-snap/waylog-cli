@@ -34,7 +34,7 @@ echo "📋 Installing to $INSTALL_DIR/waylog..."
 if [ -f "$INSTALL_DIR/waylog" ]; then
     rm "$INSTALL_DIR/waylog"
 fi
-cp target/release/waylog-cli "$INSTALL_DIR/waylog"
+cp target/release/waylog "$INSTALL_DIR/waylog"
 chmod +x "$INSTALL_DIR/waylog"
 
 # Check if in PATH
