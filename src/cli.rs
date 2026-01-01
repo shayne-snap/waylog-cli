@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 
 #[derive(Parser, Debug)]
 #[command(name = "waylog")]
@@ -11,6 +11,20 @@ pub struct Cli {
     /// Enable verbose logging
     #[arg(short, long, global = true)]
     pub verbose: bool,
+
+    /// Suppress all output (except errors)
+    #[arg(short, long, global = true)]
+    pub quiet: bool,
+
+    /// Output format
+    #[arg(long, default_value = "text", global = true)]
+    pub output: OutputFormat,
+}
+
+#[derive(Debug, Clone, ValueEnum)]
+pub enum OutputFormat {
+    Text,
+    Json,
 }
 
 #[derive(Subcommand, Debug)]

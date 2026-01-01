@@ -43,6 +43,12 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
 
+# Output and terminal
+termcolor = "1.4"
+console = "0.15"
+indicatif = "0.17"
+atty = "0.2"
+
 # Cross-platform process management
 which = "6.0"
 
