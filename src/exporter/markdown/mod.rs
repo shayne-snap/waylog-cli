@@ -1,6 +1,7 @@
+mod formatter;
+
 use crate::error::Result;
-use crate::providers::base::{ChatMessage, ChatSession, MessageRole};
-use chrono::{DateTime, Utc};
+use crate::providers::base::{ChatMessage, ChatSession};
 use std::path::Path;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
@@ -39,86 +40,16 @@ pub fn generate_markdown(session: &ChatSession) -> String {
     md.push_str("---\n\n");
 
     // Title
-    let title = extract_title(&session.messages);
+    let title = formatter::extract_title(&session.messages);
     md.push_str(&format!("# {}\n\n", title));
 
     // Messages
     for message in &session.messages {
-        md.push_str(&format_message(message));
+        md.push_str(&formatter::format_message(message));
         md.push_str("\n\n");
     }
 
     md
-}
-
-/// Format a single message
-fn format_message(message: &ChatMessage) -> String {
-    let mut md = String::new();
-
-    // Header with role and timestamp
-    let role_emoji = match message.role {
-        MessageRole::User => "👤",
-        MessageRole::Assistant => "🤖",
-        MessageRole::System => "⚙️",
-    };
-
-    let role_name = match message.role {
-        MessageRole::User => "User",
-        MessageRole::Assistant => "Assistant",
-        MessageRole::System => "System",
-    };
-
-    md.push_str(&format!(
-        "## {} {} ({})\n\n",
-        role_emoji,
-        role_name,
-        format_datetime(&message.timestamp)
-    ));
-
-    // Content
-    md.push_str(&message.content);
-    md.push('\n');
-
-    // Tool calls (Claude Code)
-    if !message.metadata.tool_calls.is_empty() {
-        md.push_str("\n**Tools Used:**\n");
-        for tool in &message.metadata.tool_calls {
-            md.push_str(&format!("- `{}`\n", tool));
-        }
-    }
-
-    // Thoughts (Gemini)
-    if !message.metadata.thoughts.is_empty() {
-        md.push_str("\n<details>\n<summary>💭 Thoughts</summary>\n\n");
-        for thought in &message.metadata.thoughts {
-            md.push_str(&format!("- {}\n", thought));
-        }
-        md.push_str("\n</details>\n");
-    }
-
-    md
-}
-
-/// Extract a title from the first user message
-fn extract_title(messages: &[ChatMessage]) -> String {
-    messages
-        .iter()
-        .find(|m| matches!(m.role, MessageRole::User))
-        .map(|m| {
-            // Take first line or first 60 characters
-            let first_line = m.content.lines().next().unwrap_or("Untitled Session");
-            if first_line.len() > 60 {
-                format!("{}...", &first_line[..60])
-            } else {
-                first_line.to_string()
-            }
-        })
-        .unwrap_or_else(|| "Untitled Session".to_string())
-}
-
-/// Format datetime in a human-readable way
-fn format_datetime(dt: &DateTime<Utc>) -> String {
-    dt.format("%Y-%m-%d %H:%M:%S UTC").to_string()
 }
 
 /// Append new messages to an existing markdown file
@@ -130,7 +61,7 @@ pub async fn append_messages(file_path: &Path, messages: &[ChatMessage]) -> Resu
         .await?;
 
     for message in messages {
-        let content = format_message(message);
+        let content = formatter::format_message(message);
         file.write_all(content.as_bytes()).await?;
         file.write_all(b"\n\n").await?;
     }
@@ -149,7 +80,8 @@ pub async fn create_markdown_file(file_path: &Path, session: &ChatSession) -> Re
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::providers::base::TokenUsage;
+    use crate::providers::base::{MessageRole, TokenUsage};
+    use chrono::Utc;
     use std::path::PathBuf;
     use tempfile::TempDir;
 
@@ -183,7 +115,10 @@ mod tests {
             "How do I implement a CLI tool?",
         )];
 
-        assert_eq!(extract_title(&messages), "How do I implement a CLI tool?");
+        assert_eq!(
+            formatter::extract_title(&messages),
+            "How do I implement a CLI tool?"
+        );
     }
 
     #[test]
@@ -193,7 +128,7 @@ mod tests {
             "This is a very long message that should be truncated because it exceeds the maximum length",
         )];
 
-        let title = extract_title(&messages);
+        let title = formatter::extract_title(&messages);
         assert!(title.len() <= 63); // 60 + "..."
         assert!(title.ends_with("..."));
     }
@@ -205,13 +140,13 @@ mod tests {
             create_test_message(MessageRole::Assistant, "Assistant response"),
         ];
 
-        assert_eq!(extract_title(&messages), "Untitled Session");
+        assert_eq!(formatter::extract_title(&messages), "Untitled Session");
     }
 
     #[test]
     fn test_extract_title_empty_messages() {
         let messages = vec![];
-        assert_eq!(extract_title(&messages), "Untitled Session");
+        assert_eq!(formatter::extract_title(&messages), "Untitled Session");
     }
 
     #[test]
@@ -221,22 +156,23 @@ mod tests {
             "First line\nSecond line\nThird line",
         )];
 
-        assert_eq!(extract_title(&messages), "First line");
+        assert_eq!(formatter::extract_title(&messages), "First line");
     }
 
     #[test]
     fn test_extract_title_empty_content() {
         let messages = vec![create_test_message(MessageRole::User, "")];
-        assert_eq!(extract_title(&messages), "Untitled Session");
+        assert_eq!(formatter::extract_title(&messages), "Untitled Session");
     }
 
     // format_datetime tests
     #[test]
     fn test_format_datetime() {
+        use chrono::DateTime;
         let dt = DateTime::parse_from_rfc3339("2024-01-01T12:00:00Z")
             .unwrap()
             .with_timezone(&Utc);
-        let formatted = format_datetime(&dt);
+        let formatted = formatter::format_datetime(&dt);
         assert_eq!(formatted, "2024-01-01 12:00:00 UTC");
     }
 
@@ -244,7 +180,7 @@ mod tests {
     #[test]
     fn test_format_message_user() {
         let message = create_test_message(MessageRole::User, "Hello, world!");
-        let formatted = format_message(&message);
+        let formatted = formatter::format_message(&message);
         assert!(formatted.contains("👤"));
         assert!(formatted.contains("User"));
         assert!(formatted.contains("Hello, world!"));
@@ -253,7 +189,7 @@ mod tests {
     #[test]
     fn test_format_message_assistant() {
         let message = create_test_message(MessageRole::Assistant, "Hello! How can I help?");
-        let formatted = format_message(&message);
+        let formatted = formatter::format_message(&message);
         assert!(formatted.contains("🤖"));
         assert!(formatted.contains("Assistant"));
         assert!(formatted.contains("Hello! How can I help?"));
@@ -262,7 +198,7 @@ mod tests {
     #[test]
     fn test_format_message_system() {
         let message = create_test_message(MessageRole::System, "System prompt");
-        let formatted = format_message(&message);
+        let formatted = formatter::format_message(&message);
         assert!(formatted.contains("⚙️"));
         assert!(formatted.contains("System"));
         assert!(formatted.contains("System prompt"));
@@ -272,7 +208,7 @@ mod tests {
     fn test_format_message_with_tool_calls() {
         let mut message = create_test_message(MessageRole::Assistant, "I'll use some tools");
         message.metadata.tool_calls = vec!["read_file".to_string(), "write_file".to_string()];
-        let formatted = format_message(&message);
+        let formatted = formatter::format_message(&message);
         assert!(formatted.contains("**Tools Used:**"));
         assert!(formatted.contains("`read_file`"));
         assert!(formatted.contains("`write_file`"));
@@ -282,7 +218,7 @@ mod tests {
     fn test_format_message_with_thoughts() {
         let mut message = create_test_message(MessageRole::Assistant, "Response");
         message.metadata.thoughts = vec!["Thought 1".to_string(), "Thought 2".to_string()];
-        let formatted = format_message(&message);
+        let formatted = formatter::format_message(&message);
         assert!(formatted.contains("<details>"));
         assert!(formatted.contains("<summary>💭 Thoughts</summary>"));
         assert!(formatted.contains("Thought 1"));
@@ -292,7 +228,7 @@ mod tests {
     #[test]
     fn test_format_message_multiline_content() {
         let message = create_test_message(MessageRole::User, "Line 1\nLine 2\nLine 3");
-        let formatted = format_message(&message);
+        let formatted = formatter::format_message(&message);
         assert!(formatted.contains("Line 1"));
         assert!(formatted.contains("Line 2"));
         assert!(formatted.contains("Line 3"));

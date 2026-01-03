@@ -1,9 +1,10 @@
+mod restore;
+
 use crate::error::Result;
 use crate::providers::base::{ChatSession, Provider};
 use crate::session::state::{ProjectState, SessionState};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tokio::fs;
 use tokio::sync::Mutex;
 
 /// Session tracker - manages active sessions and their sync state
@@ -14,7 +15,6 @@ pub struct SessionTracker {
 }
 
 impl SessionTracker {
-    /// Create a new session tracker
     /// Create a new session tracker
     pub async fn new(project_dir: PathBuf, provider: Arc<dyn Provider>) -> Result<Self> {
         // Start with empty state (stateless design)
@@ -29,7 +29,12 @@ impl SessionTracker {
         };
 
         // Restore state from existing markdown files
-        tracker.restore_from_disk().await?;
+        let sessions_map =
+            restore::restore_from_disk(&tracker.project_dir, tracker.provider.name()).await?;
+        if !sessions_map.is_empty() {
+            let mut state = tracker.state.lock().await;
+            state.sessions = sessions_map;
+        }
 
         Ok(tracker)
     }
@@ -105,52 +110,6 @@ impl SessionTracker {
             .collect();
 
         Ok((session, new_messages))
-    }
-
-    /// Scan markdown files to restore session state
-    async fn restore_from_disk(&self) -> Result<()> {
-        let history_dir = crate::utils::path::get_waylog_dir(&self.project_dir);
-        if !history_dir.exists() {
-            return Ok(());
-        }
-
-        // Read directory
-        let mut entries = match fs::read_dir(&history_dir).await {
-            Ok(e) => e,
-            Err(_) => return Ok(()),
-        };
-
-        let mut sessions_map = std::collections::HashMap::new();
-
-        while let Some(entry) = entries.next_entry().await? {
-            let path = entry.path();
-            if path.extension().and_then(|s| s.to_str()) == Some("md") {
-                // Try to parse frontmatter
-                if let Ok(fm) = crate::exporter::parse_frontmatter(&path).await {
-                    if let Some(sid) = fm.session_id {
-                        let state = SessionState {
-                            session_id: sid.clone(),
-                            provider: fm
-                                .provider
-                                .unwrap_or_else(|| self.provider.name().to_string()),
-                            file_path: PathBuf::new(), // Unknown source path
-                            markdown_path: path.clone(),
-                            synced_message_count: fm.message_count.unwrap_or(0),
-                            last_sync_time: chrono::Utc::now(), // Unknown
-                        };
-                        sessions_map.insert(sid, state);
-                    }
-                }
-            }
-        }
-
-        // Update state if we found anything
-        if !sessions_map.is_empty() {
-            let mut state = self.state.lock().await;
-            state.sessions = sessions_map;
-        }
-
-        Ok(())
     }
 }
 
