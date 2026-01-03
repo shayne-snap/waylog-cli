@@ -29,6 +29,24 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo test --all-features
 
+  integration:
+    name: Integration Tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+      - name: Run integration tests
+        run: |
+          chmod +x ./scripts/test-ci-integration.sh
+          ./scripts/test-ci-integration.sh
+
   fmt:
     name: Rustfmt
     runs-on: ubuntu-latest

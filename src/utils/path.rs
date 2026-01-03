@@ -1,5 +1,5 @@
-use crate::config::{subdirs, WAYLOG_DIR};
 use crate::error::{Result, WaylogError};
+use crate::init::{subdirs, WAYLOG_DIR};
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 
@@ -280,6 +280,13 @@ mod tests {
         // But we don't enforce assertion because behavior may vary by environment
 
         // Restore original working directory
-        std::env::set_current_dir(&original_dir).unwrap();
+        // If the original directory no longer exists (e.g., in parallel test execution),
+        // try to restore to home directory as a fallback
+        if let Err(_) = std::env::set_current_dir(&original_dir) {
+            // Fallback to home directory if original directory is gone
+            if let Ok(home) = home_dir() {
+                let _ = std::env::set_current_dir(&home);
+            }
+        }
     }
 }

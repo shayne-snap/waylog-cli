@@ -21,3 +21,4 @@ Thumbs.db
 .waylog/
 *.md.test
 *.code-workspace
+.cursor/
