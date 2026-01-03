@@ -18,11 +18,11 @@ test_case() {
     ((TOTAL++))
     echo -n "Testing: $name... "
     
-    if eval "$command" > /dev/null 2>&1; then
-        EXIT_CODE=$?
-    else
-        EXIT_CODE=$?
-    fi
+    # Temporarily disable set -e to capture exit code even if command fails
+    set +e
+    eval "$command" > /dev/null 2>&1
+    EXIT_CODE=$?
+    set -e
     
     if [ $EXIT_CODE -eq $expected_exit ]; then
         echo "✓ PASS"
@@ -43,7 +43,16 @@ test_json_output() {
     ((TOTAL++))
     echo -n "Testing: $name... "
     
+    # Temporarily disable set -e to capture exit code even if command fails
+    set +e
     if eval "$command" 2>&1 | grep -E '^\{' | head -1 | python3 -c "import sys, json; json.load(sys.stdin)" > /dev/null 2>&1; then
+        RESULT=0
+    else
+        RESULT=1
+    fi
+    set -e
+    
+    if [ $RESULT -eq 0 ]; then
         echo "✓ PASS"
         ((PASSED++))
         return 0

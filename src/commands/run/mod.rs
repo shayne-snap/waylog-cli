@@ -209,13 +209,36 @@ async fn run_agent(
         // Windows: Handle Ctrl+C
         tokio::select! {
             // Ctrl+C
-            _ = async {
+            result = async {
                 if let Some(ref mut ctrl_c_stream) = ctrl_c {
-                    ctrl_c_stream.recv().await.ok()
+                    // recv() returns Option<()>, Some(()) when signal received, None when stream closed
+                    ctrl_c_stream.recv().await
                 } else {
                     std::future::pending().await
                 }
             } => {
+                // Only process if signal was actually received (Some(()))
+                if result.is_none() {
+                    // Stream closed, wait for child process to exit normally
+                    let status = child.wait().await?;
+                    watcher_handle.abort();
+                    cleanup::cleanup_and_sync(
+                        &watcher_handle,
+                        &mut child,
+                        &tracker,
+                        &provider,
+                        &project_path,
+                        &waylog_dir,
+                        Some(status),
+                    )
+                    .await?;
+                    if !status.success() {
+                        let exit_code = status.code().unwrap_or(1);
+                        return Err(WaylogError::ChildProcessFailed(exit_code));
+                    }
+                    return Ok(());
+                }
+
                 tracing::info!("Received Ctrl+C, cleaning up...");
                 process::terminate_child(&mut child).await;
                 let status = child.wait().await?;
