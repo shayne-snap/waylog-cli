@@ -16,7 +16,9 @@ test_case() {
     local expected_exit="${3:-0}"
     
     ((TOTAL++))
-    echo -n "Testing: $name... "
+    echo ""
+    echo "Testing: $name"
+    echo "  Command: $command"
     
     # Capture both stdout and stderr for debugging
     local temp_output=$(mktemp)
@@ -28,27 +30,34 @@ test_case() {
     EXIT_CODE=$?
     set -e
     
-    if [ $EXIT_CODE -eq $expected_exit ]; then
-        echo "✓ PASS"
-        ((PASSED++))
-        rm -f "$temp_output" "$temp_error"
-        return 0
+    echo "  Exit code: $EXIT_CODE (expected: $expected_exit)"
+    
+    # Always output stderr if present
+    if [ -s "$temp_error" ]; then
+        echo "  Stderr:"
+        sed 's/^/    /' < "$temp_error"
     else
-        echo "✗ FAIL (expected $expected_exit, got $EXIT_CODE)"
-        # Output error details for debugging
-        if [ -s "$temp_error" ]; then
-            echo "  Error output:"
-            sed 's/^/    /' < "$temp_error"
-        fi
-        if [ -s "$temp_output" ]; then
-            echo "  Standard output (first 10 lines):"
-            sed 's/^/    /' < "$temp_output" | head -10
-        fi
-        ((FAILED++))
-        rm -f "$temp_output" "$temp_error"
-        # Return 0 instead of 1 to continue running all tests
-        return 0
+        echo "  Stderr: (empty)"
     fi
+    
+    # Always output stdout if present
+    if [ -s "$temp_output" ]; then
+        echo "  Stdout:"
+        sed 's/^/    /' < "$temp_output"
+    else
+        echo "  Stdout: (empty)"
+    fi
+    
+    if [ $EXIT_CODE -eq $expected_exit ]; then
+        echo "  Result: ✓ PASS"
+        ((PASSED++))
+    else
+        echo "  Result: ✗ FAIL"
+        ((FAILED++))
+    fi
+    
+    rm -f "$temp_output" "$temp_error"
+    return 0
 }
 
 # Test JSON output validity
@@ -57,7 +66,9 @@ test_json_output() {
     local command="$2"
     
     ((TOTAL++))
-    echo -n "Testing: $name... "
+    echo ""
+    echo "Testing: $name"
+    echo "  Command: $command"
     
     local temp_output=$(mktemp)
     local temp_error=$(mktemp)
@@ -65,33 +76,47 @@ test_json_output() {
     # Temporarily disable set -e to capture exit code even if command fails
     set +e
     eval "$command" > "$temp_output" 2> "$temp_error"
+    EXIT_CODE=$?
+    
+    # Try to validate JSON
     if grep -E '^\{' < "$temp_output" | head -1 | python3 -c "import sys, json; json.load(sys.stdin)" > /dev/null 2>&1; then
         RESULT=0
+        VALIDATION="Valid JSON"
     else
         RESULT=1
+        VALIDATION="Invalid JSON"
     fi
     set -e
     
-    if [ $RESULT -eq 0 ]; then
-        echo "✓ PASS"
-        ((PASSED++))
-        rm -f "$temp_output" "$temp_error"
-        return 0
+    echo "  Exit code: $EXIT_CODE"
+    echo "  JSON validation: $VALIDATION"
+    
+    # Always output stderr if present
+    if [ -s "$temp_error" ]; then
+        echo "  Stderr:"
+        sed 's/^/    /' < "$temp_error"
     else
-        echo "✗ FAIL (invalid JSON)"
-        if [ -s "$temp_error" ]; then
-            echo "  Error output:"
-            sed 's/^/    /' < "$temp_error"
-        fi
-        if [ -s "$temp_output" ]; then
-            echo "  Output (first 20 lines):"
-            sed 's/^/    /' < "$temp_output" | head -20
-        fi
-        ((FAILED++))
-        rm -f "$temp_output" "$temp_error"
-        # Return 0 instead of 1 to continue running all tests
-        return 0
+        echo "  Stderr: (empty)"
     fi
+    
+    # Always output stdout if present
+    if [ -s "$temp_output" ]; then
+        echo "  Stdout:"
+        sed 's/^/    /' < "$temp_output"
+    else
+        echo "  Stdout: (empty)"
+    fi
+    
+    if [ $RESULT -eq 0 ]; then
+        echo "  Result: ✓ PASS"
+        ((PASSED++))
+    else
+        echo "  Result: ✗ FAIL"
+        ((FAILED++))
+    fi
+    
+    rm -f "$temp_output" "$temp_error"
+    return 0
 }
 
 echo "WayLog CLI CI Integration Tests"
