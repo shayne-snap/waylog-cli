@@ -40,7 +40,9 @@ jobs:
         with:
           python-version: '3.x'
       - name: Run integration tests
-        run: ./scripts/test-ci-integration.sh
+        run: |
+          chmod +x ./scripts/test-ci-integration.sh
+          ./scripts/test-ci-integration.sh
 
   fmt:
     name: Rustfmt
