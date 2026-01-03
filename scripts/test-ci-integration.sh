@@ -2,7 +2,8 @@
 # WayLog CLI CI Integration Tests
 # Tests that don't require local environment dependencies
 
-set -e
+# Don't exit on error immediately - we want to collect all test results
+# set -e
 
 # Test statistics
 PASSED=0
@@ -25,10 +26,11 @@ test_case() {
     local temp_error=$(mktemp)
     
     # Temporarily disable set -e to capture exit code even if command fails
+    # (set -e is already disabled at script level, but keep this for safety)
     set +e
     eval "$command" > "$temp_output" 2> "$temp_error"
     EXIT_CODE=$?
-    set -e
+    set +e  # Keep disabled to continue running tests
     
     echo "  Exit code: $EXIT_CODE (expected: $expected_exit)"
     
@@ -86,7 +88,7 @@ test_json_output() {
         RESULT=1
         VALIDATION="Invalid JSON"
     fi
-    set -e
+    set +e  # Keep disabled to continue running tests
     
     echo "  Exit code: $EXIT_CODE"
     echo "  JSON validation: $VALIDATION"
@@ -121,6 +123,28 @@ test_json_output() {
 
 echo "WayLog CLI CI Integration Tests"
 echo "================================"
+
+# Environment check
+echo ""
+echo "=== Environment Check ==="
+echo "Working directory: $(pwd)"
+echo "Rust version: $(rustc --version 2>&1 || echo 'ERROR: rustc not found')"
+echo "Cargo version: $(cargo --version 2>&1 || echo 'ERROR: cargo not found')"
+echo "Python version: $(python3 --version 2>&1 || echo 'ERROR: python3 not found')"
+echo ""
+
+# Pre-build step: compile the project first to catch build errors early
+echo "=== Pre-build Step ==="
+echo "Building project (this may take a while on first run)..."
+if cargo build --release 2>&1; then
+    echo "✅ Build successful!"
+    echo ""
+else
+    echo "❌ Build failed! This will cause subsequent tests to fail."
+    echo "Build error details above."
+    echo ""
+    # Continue anyway to see which tests fail
+fi
 
 # 1. Basic Commands
 echo ""
