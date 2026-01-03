@@ -18,20 +18,36 @@ test_case() {
     ((TOTAL++))
     echo -n "Testing: $name... "
     
+    # Capture both stdout and stderr for debugging
+    local temp_output=$(mktemp)
+    local temp_error=$(mktemp)
+    
     # Temporarily disable set -e to capture exit code even if command fails
     set +e
-    eval "$command" > /dev/null 2>&1
+    eval "$command" > "$temp_output" 2> "$temp_error"
     EXIT_CODE=$?
     set -e
     
     if [ $EXIT_CODE -eq $expected_exit ]; then
         echo "✓ PASS"
         ((PASSED++))
+        rm -f "$temp_output" "$temp_error"
         return 0
     else
         echo "✗ FAIL (expected $expected_exit, got $EXIT_CODE)"
+        # Output error details for debugging
+        if [ -s "$temp_error" ]; then
+            echo "  Error output:"
+            sed 's/^/    /' < "$temp_error"
+        fi
+        if [ -s "$temp_output" ]; then
+            echo "  Standard output (first 10 lines):"
+            sed 's/^/    /' < "$temp_output" | head -10
+        fi
         ((FAILED++))
-        return 1
+        rm -f "$temp_output" "$temp_error"
+        # Return 0 instead of 1 to continue running all tests
+        return 0
     fi
 }
 
@@ -43,9 +59,13 @@ test_json_output() {
     ((TOTAL++))
     echo -n "Testing: $name... "
     
+    local temp_output=$(mktemp)
+    local temp_error=$(mktemp)
+    
     # Temporarily disable set -e to capture exit code even if command fails
     set +e
-    if eval "$command" 2>&1 | grep -E '^\{' | head -1 | python3 -c "import sys, json; json.load(sys.stdin)" > /dev/null 2>&1; then
+    eval "$command" > "$temp_output" 2> "$temp_error"
+    if grep -E '^\{' < "$temp_output" | head -1 | python3 -c "import sys, json; json.load(sys.stdin)" > /dev/null 2>&1; then
         RESULT=0
     else
         RESULT=1
@@ -55,11 +75,22 @@ test_json_output() {
     if [ $RESULT -eq 0 ]; then
         echo "✓ PASS"
         ((PASSED++))
+        rm -f "$temp_output" "$temp_error"
         return 0
     else
         echo "✗ FAIL (invalid JSON)"
+        if [ -s "$temp_error" ]; then
+            echo "  Error output:"
+            sed 's/^/    /' < "$temp_error"
+        fi
+        if [ -s "$temp_output" ]; then
+            echo "  Output (first 20 lines):"
+            sed 's/^/    /' < "$temp_output" | head -20
+        fi
         ((FAILED++))
-        return 1
+        rm -f "$temp_output" "$temp_error"
+        # Return 0 instead of 1 to continue running all tests
+        return 0
     fi
 }
 
