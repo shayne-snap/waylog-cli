@@ -15,6 +15,7 @@ use cli::{Cli, Commands, OutputFormat};
 use commands::{handle_pull, handle_run};
 use error::WaylogError;
 use output::Output;
+use std::io::Write;
 
 #[tokio::main]
 async fn main() {
@@ -28,6 +29,27 @@ async fn main() {
 
     // Execute main logic and handle errors with appropriate exit codes
     let result = async {
+        // 0. Validate provider for pull command BEFORE resolving project root
+        // This ensures we catch invalid providers even if project is not initialized
+        if let Commands::Pull {
+            provider: Some(ref provider_name),
+            ..
+        } = cli.command
+        {
+            match providers::get_provider(provider_name) {
+                Ok(_) => {} // Provider is valid, continue
+                Err(WaylogError::ProviderNotFound(ref name)) => {
+                    output.error(format!("'{}' is not a recognized provider.", name))?;
+                    writeln!(output.stderr(), "\nAvailable providers:")?;
+                    for provider in providers::list_providers() {
+                        writeln!(output.stderr(), "- {}", provider)?;
+                    }
+                    return Err(WaylogError::ProviderNotFound(name.clone()));
+                }
+                Err(e) => return Err(e),
+            }
+        }
+
         // 1. Resolve project root directory
         let (project_root, is_new_project) = init::resolve_project_root(&cli.command, &mut output)?;
 

@@ -4,6 +4,15 @@ use std::io::{self, Write};
 use termcolor::{Color, ColorSpec, WriteColor};
 
 impl Output {
+    /// Print unknown provider error
+    pub fn unknown_provider(&mut self, name: &str) -> io::Result<()> {
+        self.error(format!("'{}' is not a recognized provider.", name))?;
+        writeln!(self.stderr(), "\nAvailable providers:")?;
+        for provider in crate::providers::list_providers() {
+            writeln!(self.stderr(), "- {}", provider)?;
+        }
+        Ok(())
+    }
     /// Print pull start message
     pub fn pull_start(&mut self, project_path: &std::path::Path) -> io::Result<()> {
         if !self.quiet() {

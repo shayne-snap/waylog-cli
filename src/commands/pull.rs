@@ -1,4 +1,4 @@
-use crate::error::Result;
+use crate::error::{Result, WaylogError};
 use crate::output::Output;
 use crate::synchronizer::SyncStatus;
 use crate::{providers, session, synchronizer};
@@ -13,6 +13,19 @@ pub async fn handle_pull(
     project_path: PathBuf,
     output: &mut Output,
 ) -> Result<()> {
+    // 1. Validate provider first (before any other operations)
+    // This ensures we catch invalid providers even if project is not initialized
+    if let Some(ref name) = provider_name {
+        match providers::get_provider(name) {
+            Ok(_) => {} // Provider is valid, continue
+            Err(WaylogError::ProviderNotFound(ref invalid_name)) => {
+                output.unknown_provider(invalid_name)?;
+                return Err(WaylogError::ProviderNotFound(name.clone()));
+            }
+            Err(e) => return Err(e),
+        }
+    }
+
     output.pull_start(&project_path)?;
 
     // Filter providers
