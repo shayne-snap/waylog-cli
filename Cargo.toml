@@ -20,11 +20,7 @@ dialoguer = "0.11"
 
 # Async runtime
 tokio = { version = "1.35", features = ["full"] }
-
-# Signal handling
-signal-hook = "0.3"
-signal-hook-tokio = { version = "0.4", features = ["futures-v0_3"] }
-futures = "0.3"
+# Note: tokio::signal is included in tokio with "full" features
 
 # JSON/JSONL parsing
 serde = { version = "1.0", features = ["derive"] }

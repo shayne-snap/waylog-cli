@@ -4,9 +4,6 @@ mod process;
 use crate::error::{Result, WaylogError};
 use crate::output::Output;
 use crate::{providers, session, utils, watcher};
-use futures::stream::StreamExt;
-use signal_hook::consts::{SIGINT, SIGTERM};
-use signal_hook_tokio::Signals;
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
@@ -89,55 +86,68 @@ async fn run_agent(
         .stderr(Stdio::inherit())
         .spawn()?;
 
-    // Setup signal handling
-    let mut signals = match Signals::new([SIGINT, SIGTERM]) {
-        Ok(s) => s,
-        Err(e) => {
-            tracing::warn!(
-                "Failed to setup signal handling: {}. Continuing without signal support.",
-                e
-            );
-            // Fallback to original behavior without signal handling
-            let status = child.wait().await?;
-            watcher_handle.abort();
-            cleanup::cleanup_and_sync(
-                &watcher_handle,
-                &mut child,
-                &tracker,
-                &provider,
-                &project_path,
-                &waylog_dir,
-                Some(status),
-            )
-            .await?;
-            // Propagate child process exit code
-            if !status.success() {
-                let exit_code = status.code().unwrap_or(1);
-                return Err(WaylogError::ChildProcessFailed(exit_code));
+    // Setup cross-platform signal handling using tokio::signal
+    #[cfg(unix)]
+    let mut sigint = {
+        use tokio::signal::unix::{signal, SignalKind};
+        match signal(SignalKind::interrupt()) {
+            Ok(s) => Some(s),
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to setup SIGINT handler: {}. Continuing without signal support.",
+                    e
+                );
+                None
             }
-            return Ok(());
         }
     };
 
-    // Use select! to wait for either signal or child process exit
-    let exit_status = tokio::select! {
-        // Signal received
-        signal_result = signals.next() => {
-            if let Some(sig) = signal_result {
-                let signal_name = match sig {
-                    SIGINT => "SIGINT (Ctrl+C)",
-                    SIGTERM => "SIGTERM",
-                    _ => "unknown signal",
-                };
-                tracing::info!("Received {}, cleaning up...", signal_name);
+    #[cfg(unix)]
+    let mut sigterm = {
+        use tokio::signal::unix::{signal, SignalKind};
+        match signal(SignalKind::terminate()) {
+            Ok(s) => Some(s),
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to setup SIGTERM handler: {}. Continuing without signal support.",
+                    e
+                );
+                None
+            }
+        }
+    };
 
-                // Terminate child process
+    #[cfg(windows)]
+    let mut ctrl_c = {
+        use tokio::signal::windows::ctrl_c;
+        match ctrl_c() {
+            Ok(ctrl_c_stream) => Some(ctrl_c_stream),
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to setup Ctrl+C handler: {}. Continuing without signal support.",
+                    e
+                );
+                None
+            }
+        }
+    };
+
+    // Unified signal handling logic using tokio::select!
+    #[cfg(unix)]
+    let exit_status = {
+        // Unix: Handle SIGINT and SIGTERM
+        tokio::select! {
+            // SIGINT (Ctrl+C)
+            _ = async {
+                if let Some(ref mut sig) = sigint {
+                    sig.recv().await
+                } else {
+                    std::future::pending().await
+                }
+            } => {
+                tracing::info!("Received SIGINT (Ctrl+C), cleaning up...");
                 process::terminate_child(&mut child).await;
-
-                // Wait for child to exit and get its status
                 let status = child.wait().await?;
-
-                // Perform cleanup
                 cleanup::cleanup_and_sync(
                     &watcher_handle,
                     &mut child,
@@ -148,19 +158,36 @@ async fn run_agent(
                     Some(status),
                 )
                 .await?;
-
-                // Propagate child process exit code (or signal exit code)
-                // Standard exit codes: 130 for SIGINT, 143 for SIGTERM
-                let exit_code = match sig {
-                    SIGINT => 130,
-                    SIGTERM => 143,
-                    _ => status.code().unwrap_or(1),
-                };
-                return Err(WaylogError::ChildProcessFailed(exit_code));
-            } else {
-                // Signals stream ended unexpectedly
-                tracing::warn!("Signal stream ended unexpectedly");
+                // Standard exit code for SIGINT: 130
+                return Err(WaylogError::ChildProcessFailed(130));
+            }
+            // SIGTERM
+            _ = async {
+                if let Some(ref mut sig) = sigterm {
+                    sig.recv().await
+                } else {
+                    std::future::pending().await
+                }
+            } => {
+                tracing::info!("Received SIGTERM, cleaning up...");
+                process::terminate_child(&mut child).await;
                 let status = child.wait().await?;
+                cleanup::cleanup_and_sync(
+                    &watcher_handle,
+                    &mut child,
+                    &tracker,
+                    &provider,
+                    &project_path,
+                    &waylog_dir,
+                    Some(status),
+                )
+                .await?;
+                // Standard exit code for SIGTERM: 143
+                return Err(WaylogError::ChildProcessFailed(143));
+            }
+            // Child process exited normally
+            status_result = child.wait() => {
+                let status = status_result?;
                 watcher_handle.abort();
                 cleanup::cleanup_and_sync(
                     &watcher_handle,
@@ -172,29 +199,55 @@ async fn run_agent(
                     Some(status),
                 )
                 .await?;
-                // Propagate child process exit code
-                if !status.success() {
-                    let exit_code = status.code().unwrap_or(1);
-                    return Err(WaylogError::ChildProcessFailed(exit_code));
-                }
-                return Ok(());
+                Some(status)
             }
         }
-        // Child process exited normally
-        status_result = child.wait() => {
-            let status = status_result?;
-            watcher_handle.abort();
-            cleanup::cleanup_and_sync(
-                &watcher_handle,
-                &mut child,
-                &tracker,
-                &provider,
-                &project_path,
-                &waylog_dir,
-                Some(status),
-            )
-            .await?;
-            Some(status)
+    };
+
+    #[cfg(windows)]
+    let exit_status = {
+        // Windows: Handle Ctrl+C
+        tokio::select! {
+            // Ctrl+C
+            _ = async {
+                if let Some(ref mut ctrl_c_stream) = ctrl_c {
+                    ctrl_c_stream.recv().await.ok()
+                } else {
+                    std::future::pending().await
+                }
+            } => {
+                tracing::info!("Received Ctrl+C, cleaning up...");
+                process::terminate_child(&mut child).await;
+                let status = child.wait().await?;
+                cleanup::cleanup_and_sync(
+                    &watcher_handle,
+                    &mut child,
+                    &tracker,
+                    &provider,
+                    &project_path,
+                    &waylog_dir,
+                    Some(status),
+                )
+                .await?;
+                // Standard exit code for Ctrl+C: 130 (same as Unix SIGINT)
+                return Err(WaylogError::ChildProcessFailed(130));
+            }
+            // Child process exited normally
+            status_result = child.wait() => {
+                let status = status_result?;
+                watcher_handle.abort();
+                cleanup::cleanup_and_sync(
+                    &watcher_handle,
+                    &mut child,
+                    &tracker,
+                    &provider,
+                    &project_path,
+                    &waylog_dir,
+                    Some(status),
+                )
+                .await?;
+                Some(status)
+            }
         }
     };
 
