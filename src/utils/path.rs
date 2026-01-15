@@ -192,12 +192,13 @@ mod tests {
 
     #[test]
     fn test_get_waylog_dir() {
-        let project_dir = Path::new("/tmp/test-project");
-        let waylog_dir = get_waylog_dir(project_dir);
+        let project_dir = std::env::temp_dir().join("test-project");
+        let waylog_dir = get_waylog_dir(&project_dir);
 
         let expected = project_dir.join(".waylog").join("history");
         assert_eq!(waylog_dir, expected);
-        assert!(waylog_dir.to_string_lossy().ends_with(".waylog/history"));
+        // Check path ends with correct components (platform-independent)
+        assert!(waylog_dir.ends_with(Path::new(".waylog").join("history")));
     }
 
     #[test]

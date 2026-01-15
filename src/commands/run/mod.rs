@@ -331,11 +331,11 @@ mod tests {
         }
 
         fn data_dir(&self) -> Result<PathBuf> {
-            Ok(PathBuf::from("/tmp"))
+            Ok(std::env::temp_dir())
         }
 
         fn session_dir(&self, _project_path: &Path) -> Result<PathBuf> {
-            Ok(PathBuf::from("/tmp/sessions"))
+            Ok(std::env::temp_dir().join("sessions"))
         }
 
         async fn find_latest_session(&self, _project_path: &Path) -> Result<Option<PathBuf>> {
@@ -417,7 +417,14 @@ mod tests {
             tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         });
 
-        // Create a simple child process (echo command that exits immediately)
+        // Create a simple child process that exits immediately
+        // On Windows, echo is a shell built-in, so use cmd /C
+        #[cfg(windows)]
+        let mut child = TokioCommand::new("cmd")
+            .args(["/C", "echo", "test"])
+            .spawn()
+            .unwrap();
+        #[cfg(not(windows))]
         let mut child = TokioCommand::new("echo").arg("test").spawn().unwrap();
 
         // Wait for child to exit
@@ -471,7 +478,13 @@ mod tests {
             tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         });
 
-        // Create child process
+        // Create child process (cross-platform)
+        #[cfg(windows)]
+        let mut child = TokioCommand::new("cmd")
+            .args(["/C", "echo", "test"])
+            .spawn()
+            .unwrap();
+        #[cfg(not(windows))]
         let mut child = TokioCommand::new("echo").arg("test").spawn().unwrap();
         let _ = child.wait().await;
 
@@ -507,11 +520,11 @@ mod tests {
             }
 
             fn data_dir(&self) -> Result<PathBuf> {
-                Ok(PathBuf::from("/tmp"))
+                Ok(std::env::temp_dir())
             }
 
             fn session_dir(&self, _project_path: &Path) -> Result<PathBuf> {
-                Ok(PathBuf::from("/tmp/sessions"))
+                Ok(std::env::temp_dir().join("sessions"))
             }
 
             async fn find_latest_session(&self, _project_path: &Path) -> Result<Option<PathBuf>> {
@@ -549,6 +562,12 @@ mod tests {
             tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         });
 
+        #[cfg(windows)]
+        let mut child = TokioCommand::new("cmd")
+            .args(["/C", "echo", "test"])
+            .spawn()
+            .unwrap();
+        #[cfg(not(windows))]
         let mut child = TokioCommand::new("echo").arg("test").spawn().unwrap();
         let _ = child.wait().await;
 

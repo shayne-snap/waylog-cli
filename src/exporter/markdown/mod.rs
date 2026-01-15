@@ -82,7 +82,6 @@ mod tests {
     use super::*;
     use crate::providers::base::{MessageRole, TokenUsage};
     use chrono::Utc;
-    use std::path::PathBuf;
     use tempfile::TempDir;
 
     fn create_test_message(role: MessageRole, content: &str) -> ChatMessage {
@@ -100,7 +99,7 @@ mod tests {
         ChatSession {
             session_id: "test-session".to_string(),
             provider: "claude".to_string(),
-            project_path: PathBuf::from("/tmp/test-project"),
+            project_path: std::env::temp_dir().join("test-project"),
             started_at: now,
             updated_at: now,
             messages,

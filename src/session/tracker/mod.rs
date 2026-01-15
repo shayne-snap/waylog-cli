@@ -148,11 +148,11 @@ mod tests {
         }
 
         fn data_dir(&self) -> Result<PathBuf> {
-            Ok(PathBuf::from("/tmp"))
+            Ok(std::env::temp_dir())
         }
 
         fn session_dir(&self, _project_path: &Path) -> Result<PathBuf> {
-            Ok(PathBuf::from("/tmp/sessions"))
+            Ok(std::env::temp_dir().join("sessions"))
         }
 
         async fn find_latest_session(&self, _project_path: &Path) -> Result<Option<PathBuf>> {
@@ -275,8 +275,8 @@ message_count: 5
         tracker
             .update_session(
                 "session-1".to_string(),
-                PathBuf::from("/tmp/session-1.json"),
-                PathBuf::from("/tmp/session-1.md"),
+                temp_dir.path().join("session-1.json"),
+                temp_dir.path().join("session-1.md"),
                 10,
             )
             .await
@@ -300,11 +300,11 @@ message_count: 5
         assert_eq!(tracker.get_markdown_path("session-1").await, None);
 
         // Update session
-        let markdown_path = PathBuf::from("/tmp/session-1.md");
+        let markdown_path = temp_dir.path().join("session-1.md");
         tracker
             .update_session(
                 "session-1".to_string(),
-                PathBuf::from("/tmp/session-1.json"),
+                temp_dir.path().join("session-1.json"),
                 markdown_path.clone(),
                 5,
             )
@@ -329,8 +329,8 @@ message_count: 5
             .unwrap();
 
         let session_id = "session-1".to_string();
-        let file_path = PathBuf::from("/tmp/session-1.json");
-        let markdown_path = PathBuf::from("/tmp/session-1.md");
+        let file_path = temp_dir.path().join("session-1.json");
+        let markdown_path = temp_dir.path().join("session-1.md");
         let synced_count = 7;
 
         tracker
@@ -369,8 +369,8 @@ message_count: 5
         tracker
             .update_session(
                 session_id.clone(),
-                PathBuf::from("/tmp/session-1.json"),
-                PathBuf::from("/tmp/session-1.md"),
+                temp_dir.path().join("session-1.json"),
+                temp_dir.path().join("session-1.md"),
                 5,
             )
             .await
@@ -380,8 +380,8 @@ message_count: 5
         tracker
             .update_session(
                 session_id.clone(),
-                PathBuf::from("/tmp/session-1-v2.json"),
-                PathBuf::from("/tmp/session-1-v2.md"),
+                temp_dir.path().join("session-1-v2.json"),
+                temp_dir.path().join("session-1-v2.md"),
                 10,
             )
             .await
@@ -394,7 +394,7 @@ message_count: 5
         assert_eq!(session_state.synced_message_count, 10);
         assert_eq!(
             session_state.markdown_path,
-            PathBuf::from("/tmp/session-1-v2.md")
+            temp_dir.path().join("session-1-v2.md")
         );
     }
 
@@ -439,7 +439,7 @@ message_count: 5
             .update_session(
                 "session-1".to_string(),
                 session_file.clone(),
-                PathBuf::from("/tmp/session-1.md"),
+                temp_dir.path().join("session-1.md"),
                 3,
             )
             .await
@@ -472,7 +472,7 @@ message_count: 5
             .update_session(
                 "session-1".to_string(),
                 session_file.clone(),
-                PathBuf::from("/tmp/session-1.md"),
+                temp_dir.path().join("session-1.md"),
                 5,
             )
             .await
@@ -638,8 +638,8 @@ message_count: 5
         tracker
             .update_session(
                 "session-1".to_string(),
-                PathBuf::from("/tmp/session-1.json"),
-                PathBuf::from("/tmp/session-1.md"),
+                temp_dir.path().join("session-1.json"),
+                temp_dir.path().join("session-1.md"),
                 5,
             )
             .await

@@ -26,6 +26,13 @@ WayLog CLI is a lightweight tool written in Rust that automatically saves your A
 brew install shayne-snap/tap/waylog
 ```
 
+### Using Scoop (Windows)
+
+```powershell
+scoop bucket add waylog https://github.com/shayne-snap/scoop-bucket
+scoop install waylog
+```
+
 ### Using Cargo
 
 ```bash

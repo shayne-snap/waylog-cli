@@ -55,6 +55,10 @@ jobs:
             artifact_name: waylog
             asset_name: waylog-linux-x64
             target: x86_64-unknown-linux-musl
+          - os: windows-latest
+            artifact_name: waylog.exe
+            asset_name: waylog-windows-x64
+            target: x86_64-pc-windows-msvc
 
     steps:
       - name: Checkout code
@@ -78,14 +82,20 @@ jobs:
         shell: bash
         run: |
           cd target/${{ matrix.target }}/release
-          tar -czf ../../../${{ matrix.asset_name }}.tar.gz ${{ matrix.artifact_name }}
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            7z a ../../../${{ matrix.asset_name }}.zip ${{ matrix.artifact_name }}
+          else
+            tar -czf ../../../${{ matrix.asset_name }}.tar.gz ${{ matrix.artifact_name }}
+          fi
           cd ../../..
 
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v1
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          files: ${{ matrix.asset_name }}.tar.gz
+          files: |
+            ${{ matrix.asset_name }}.tar.gz
+            ${{ matrix.asset_name }}.zip
 
   update-formula:
     name: Update Homebrew Formula
