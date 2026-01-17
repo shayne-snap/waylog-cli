@@ -160,10 +160,43 @@ impl ClaudeProvider {
 
         // Format XML content to look like official export
         let content = if role == MessageRole::User {
-            Self::format_claude_xml(&content)
+            // Filter out internal IDE state messages (ide_opened_file, ide_edit_file, etc.)
+            // We use a regex to match ANY tag starting with <ide_ and ending with </ide_...>
+            // If the message is purely these tags (whitespace allowed), we skip it.
+            // If there is other content (user typed text), we keep the text.
+
+            // Note: We create Regex here. In a high-throughput server we'd use OnceLock/lazy_static,
+            // but for a CLI syncing tool this is acceptable (or we could move it to struct).
+            // The (?s) flag enables dot matches newline (multi-line matching).
+            let re = regex::Regex::new(r"(?s)<ide_[a-z_]+>.*?</ide_[a-z_]+>")
+                .map_err(|e| WaylogError::Internal(e.to_string()))?;
+            let clean_content = re.replace_all(&content, "").to_string();
+
+            if clean_content.trim().is_empty() {
+                // If nothing remains after removing tags, it was purely internal state -> Skip
+                return Ok(None);
+            }
+
+            Self::format_claude_xml(clean_content.trim())
         } else {
             content
         };
+
+        // Final check: if content became empty after formatting (and it's not a tool-use only message we want to keep?
+        // Logic says we keep tool calls if they are robust, but here we just check text content string).
+        // If content is empty/whitespace AND no tool calls, skip.
+        // Wait, current logic for tool_calls extraction is BELOW this block.
+        // We need to be careful. The original code extracted tool_calls LATER (lines 184).
+        // But `content` variable here is just the text part.
+        // If text content is empty, we might still want to return the message IF it has tool calls (which are extracted from `event.message`).
+        // However, the text content `content` specifically refers to the `Text` part.
+        // If `content` is empty here, we verify later?
+        // Original code: `if content.is_empty() { return Ok(None); }` at line 157.
+        // This suggests that if there is NO text content (even if there are tool calls in `Array`), it returns None?
+        // Let's check line 140-153. It extracts text from Array.
+        // If an Array has ONLY tool_use and no text, `content` string matches "" (joined empty strings).
+        // So YES, the original logic filtered out messages with NO text even if they had tool use.
+        // My filtering logic above maintains this: if `clean_content` is empty, we return `Ok(None)`.
 
         let timestamp = event
             .timestamp
@@ -325,4 +358,55 @@ struct ClaudeUsage {
     input_tokens: u32,
     output_tokens: u32,
     cache_read_input_tokens: Option<u32>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::providers::base::{MessageRole, Provider};
+
+    // Helper to create a user message event with content
+    fn create_user_event(content: &str) -> ClaudeEvent {
+        ClaudeEvent {
+            event_type: "user".to_string(),
+            session_id: Some("test-session".to_string()),
+            cwd: None,
+            timestamp: None,
+            uuid: None,
+            is_sidechain: None,
+            message: Some(ClaudeMessage {
+                role: "user".to_string(),
+                content: ClaudeContent::Text(content.to_string()),
+                model: None,
+                usage: None,
+            }),
+        }
+    }
+
+    #[test]
+    fn test_ide_tag_filtering() {
+        let provider = ClaudeProvider::new();
+
+        // Case 1: Pure IDE tag message should be filtered out
+        let content = "<ide_opened_file>some/path/file.txt</ide_opened_file>";
+        let event = create_user_event(content);
+        let result = provider.parse_message(event).unwrap();
+
+        assert!(
+            result.is_none(),
+            "Pure IDE tag message should be filtered out"
+        );
+
+        // Case 2: Mixed content (User text + IDE tag)
+        let content = "Check this file.\n<ide_opened_file>path/to/file</ide_opened_file>";
+        let event = create_user_event(content);
+        let result = provider.parse_message(event).unwrap();
+
+        assert!(result.is_some());
+        let msg = result.unwrap();
+        assert_eq!(
+            msg.content, "Check this file.",
+            "Tag should be stripped from mixed content"
+        );
+    }
 }

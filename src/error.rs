@@ -25,6 +25,9 @@ pub enum WaylogError {
 
     #[error("Child process exited with code {0}")]
     ChildProcessFailed(i32),
+
+    #[error("Internal error: {0}")]
+    Internal(String),
 }
 
 impl WaylogError {
@@ -40,7 +43,7 @@ impl WaylogError {
             // Service unavailable
             WaylogError::AgentNotInstalled(_) => exitcode::UNAVAILABLE,
             // Internal software errors
-            WaylogError::PathError(_) => exitcode::SOFTWARE,
+            WaylogError::PathError(_) | WaylogError::Internal(_) => exitcode::SOFTWARE,
             // Child process exit code (propagate directly)
             WaylogError::ChildProcessFailed(code) => *code,
         }
