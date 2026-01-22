@@ -29,17 +29,17 @@ pub fn get_ai_data_dir(tool_name: &str) -> Result<PathBuf> {
     }
 }
 
-/// Encode a path for Claude Code (replace / or \ with -)
+/// Encode a path for Claude Code (replace all non-alphanumeric chars with -)
 /// Unix: /Users/name/project -> -Users-name-project
 /// Windows: C:\Users\name\project -> C--Users-name-project
+/// Non-ASCII: /Users/名字/project -> -Users----project
 pub fn encode_path_claude(path: &Path) -> String {
     let path_str = path.to_string_lossy();
-
-    // Normalize path separators to forward slash first
     let normalized = path_str.replace('\\', "/");
 
-    // Replace all slashes with hyphens (including the leading one)
-    normalized.replace(['/', ':'], "-") // Handle Windows drive letters (C: -> C-)
+    normalized.chars()
+        .map(|c| if c.is_ascii_alphanumeric() || c == '-' { c } else { '-' })
+        .collect()
 }
 
 /// Encode a path for Gemini (SHA-256 hash)
@@ -117,9 +117,23 @@ mod tests {
 
     #[test]
     fn test_encode_path_claude_with_spaces() {
-        // Note: Function only replaces path separators, doesn't handle spaces
+        // Spaces are replaced with hyphens
         let path = Path::new("/home/my project");
-        assert_eq!(encode_path_claude(path), "-home-my project");
+        assert_eq!(encode_path_claude(path), "-home-my-project");
+    }
+
+    #[test]
+    fn test_encode_path_claude_non_ascii() {
+        // Non-ASCII characters are replaced with hyphens
+        let path = Path::new("/Users/名字/project");
+        assert_eq!(encode_path_claude(path), "-Users----project");
+    }
+
+    #[test]
+    fn test_encode_path_claude_special_chars() {
+        // Special characters are replaced with hyphens
+        let path = Path::new("/home/user@#$%");
+        assert_eq!(encode_path_claude(path), "-home-user----");
     }
 
     #[test]
